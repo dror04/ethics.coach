@@ -1,0 +1,171 @@
+{
+  "name": "10 — PandaDoc Signed Contract → SERVE Stage + Engagement",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": "{{connection.webhook}}",
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": {},
+        "notes": "Receives PandaDoc document_state_changed webhook. Copy webhook URL into PandaDoc Settings → Integrations → Webhooks."
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:Filter",
+      "version": 1,
+      "parameters": {
+        "label": "Status is document.completed",
+        "condition": {
+          "a": "{{1.body.event}}",
+          "b": "document_state_changed",
+          "o": "text:equal"
+        }
+      },
+      "mapper": {},
+      "metadata": { "designer": { "x": 200, "y": 0 } }
+    },
+    {
+      "id": 3,
+      "module": "builtin:Filter",
+      "version": 1,
+      "parameters": {
+        "label": "Document status is completed",
+        "condition": {
+          "a": "{{1.body.data.status}}",
+          "b": "document.completed",
+          "o": "text:equal"
+        }
+      },
+      "mapper": {},
+      "metadata": { "designer": { "x": 400, "y": 0 } }
+    },
+    {
+      "id": 4,
+      "module": "builtin:SetVariable",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "name": "recipientEmail",
+        "value": "{{1.body.data.recipients[1].email}}",
+        "scope": "roundtrip"
+      },
+      "metadata": {
+        "designer": { "x": 600, "y": 0 },
+        "notes": "Index [1] assumes first recipient is the client (index [0] may be sender). Adjust if needed."
+      }
+    },
+    {
+      "id": 5,
+      "module": "builtin:SetVariable",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "name": "documentName",
+        "value": "{{1.body.data.name}}",
+        "scope": "roundtrip"
+      },
+      "metadata": { "designer": { "x": 800, "y": 0 } }
+    },
+    {
+      "id": 6,
+      "module": "builtin:SetVariable",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "name": "completionDate",
+        "value": "{{formatDate(parseDate(1.body.data.date_completed); 'YYYY-MM-DD')}}",
+        "scope": "roundtrip"
+      },
+      "metadata": { "designer": { "x": 1000, "y": 0 } }
+    },
+    {
+      "id": 7,
+      "module": "airtable:ActionSearchRecords",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.airtable}}",
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "filterByFormula": "LOWER({Email}) = LOWER('{{recipientEmail}}')",
+        "maxRecords": 1
+      },
+      "mapper": {},
+      "metadata": { "designer": { "x": 1200, "y": 0 } }
+    },
+    {
+      "id": 8,
+      "module": "builtin:Filter",
+      "version": 1,
+      "parameters": {
+        "label": "Contact found",
+        "condition": {
+          "a": "{{7.total}}",
+          "b": "0",
+          "o": "number:greater"
+        }
+      },
+      "mapper": {},
+      "metadata": { "designer": { "x": 1400, "y": 0 } }
+    },
+    {
+      "id": 9,
+      "module": "airtable:ActionUpdateRecord",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.airtable}}",
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "id": "{{7.records[].id}}"
+      },
+      "mapper": {
+        "Stage": "SERVE",
+        "Contract Date": "{{completionDate}}",
+        "Last Interaction": "{{formatDate(now; 'YYYY-MM-DD')}}"
+      },
+      "metadata": { "designer": { "x": 1600, "y": 0 } }
+    },
+    {
+      "id": 10,
+      "module": "airtable:ActionCreateRecord",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.airtable}}",
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Engagements"
+      },
+      "mapper": {
+        "Engagement Name": "{{7.records[].fields.Name}} — {{completionDate}}",
+        "Contact": ["{{7.records[].id}}"],
+        "Status": "Active",
+        "Start Date": "{{completionDate}}",
+        "Contract Date": "{{completionDate}}",
+        "Notes": "Contract signed via PandaDoc: {{documentName}}"
+      },
+      "metadata": { "designer": { "x": 1800, "y": 0 } }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] },
+    "zone": "us1.make.com"
+  }
+}

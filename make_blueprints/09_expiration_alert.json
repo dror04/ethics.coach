@@ -1,0 +1,104 @@
+{
+  "name": "09 — Daily Expiration Alert (14-Day Warning)",
+  "flow": [
+    {
+      "id": 1,
+      "module": "builtin:BasicScheduler",
+      "version": 1,
+      "parameters": {
+        "interval": [
+          {
+            "type": "DAY",
+            "day": 1,
+            "time": "09:00"
+          }
+        ]
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": {},
+        "notes": "Runs every day at 9:00 AM. Adjust timezone in scenario settings."
+      }
+    },
+    {
+      "id": 2,
+      "module": "airtable:ActionSearchRecords",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.airtable}}",
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Engagements",
+        "filterByFormula": "AND({Status} = 'Active', IS_BEFORE({Expiration Date}, DATEADD(TODAY(), 14, 'days')), IS_AFTER({Expiration Date}, TODAY()))",
+        "maxRecords": 100,
+        "sort": [{ "field": "Expiration Date", "direction": "asc" }]
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 200, "y": 0 }
+      }
+    },
+    {
+      "id": 3,
+      "module": "builtin:Filter",
+      "version": 1,
+      "parameters": {
+        "label": "At least one expiring engagement found",
+        "condition": {
+          "a": "{{2.total}}",
+          "b": "0",
+          "o": "number:greater"
+        }
+      },
+      "mapper": {},
+      "metadata": { "designer": { "x": 400, "y": 0 } }
+    },
+    {
+      "id": 4,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "array": "{{2.records}}"
+      },
+      "metadata": {
+        "designer": { "x": 600, "y": 0 },
+        "notes": "Iterate over each expiring engagement."
+      }
+    },
+    {
+      "id": 5,
+      "module": "gmail:ActionSendEmail",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.gmail}}"
+      },
+      "mapper": {
+        "to": "{{env.MY_EMAIL}}",
+        "subject": "⚠️ Package expiring soon: {{4.fields['Contact Name']}}",
+        "content": "{{4.fields['Contact Name']}}'s coaching package expires on {{formatDate(parseDate(4.fields['Expiration Date']); 'MMMM D, YYYY')}}.\n\nSessions remaining: {{ifempty(4.fields['Sessions Remaining']; 'unknown')}}\nPackage: {{ifempty(4.fields.Package; '—')}}\nFee: ${{ifempty(4.fields.Fee; '—')}}\nStatus: {{4.fields.Status}}\n\nConsider scheduling a renewal conversation.\n\nAirtable record:\nhttps://airtable.com/{{env.AIRTABLE_BASE_ID}}/Engagements/{{4.id}}",
+        "contentType": "text"
+      },
+      "metadata": {
+        "designer": { "x": 800, "y": 0 }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] },
+    "zone": "us1.make.com"
+  }
+}

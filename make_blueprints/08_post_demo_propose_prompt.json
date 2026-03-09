@@ -1,0 +1,130 @@
+{
+  "name": "08 — Post-Breakthrough Session → Proposal Prompt Email",
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-calendar:TriggerWatchEvents",
+      "version": 3,
+      "parameters": {
+        "account": "{{connection.google-calendar}}",
+        "calendarId": "primary",
+        "watchNewEvents": false,
+        "watchUpdatedEvents": true
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": {},
+        "notes": "Watches for updated calendar events to catch when breakthrough sessions complete."
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:Filter",
+      "version": 1,
+      "parameters": {
+        "label": "Title contains 'breakthrough' AND event ended within last 2 hours",
+        "condition": {
+          "a": "{{and(\n  contains(lower(1.summary); 'breakthrough');\n  parseDate(1.end.dateTime) < now;\n  parseDate(1.end.dateTime) > addHours(now; -2)\n)}}",
+          "b": "true",
+          "o": "boolean:equal"
+        }
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 200, "y": 0 }
+      }
+    },
+    {
+      "id": 3,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "array": "{{1.attendees}}"
+      },
+      "metadata": {
+        "designer": { "x": 400, "y": 0 },
+        "notes": "Iterate over attendees (excluding self)."
+      }
+    },
+    {
+      "id": 4,
+      "module": "builtin:Filter",
+      "version": 1,
+      "parameters": {
+        "label": "Exclude self",
+        "condition": {
+          "a": "{{lower(3.email)}}",
+          "b": "{{lower(env.MY_EMAIL)}}",
+          "o": "text:notequal"
+        }
+      },
+      "mapper": {},
+      "metadata": { "designer": { "x": 600, "y": 0 } }
+    },
+    {
+      "id": 5,
+      "module": "airtable:ActionSearchRecords",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.airtable}}",
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "filterByFormula": "LOWER({Email}) = LOWER('{{3.email}}')",
+        "maxRecords": 1
+      },
+      "mapper": {},
+      "metadata": { "designer": { "x": 800, "y": 0 } }
+    },
+    {
+      "id": 6,
+      "module": "builtin:Filter",
+      "version": 1,
+      "parameters": {
+        "label": "Contact found",
+        "condition": {
+          "a": "{{5.total}}",
+          "b": "0",
+          "o": "number:greater"
+        }
+      },
+      "mapper": {},
+      "metadata": { "designer": { "x": 1000, "y": 0 } }
+    },
+    {
+      "id": 7,
+      "module": "gmail:ActionSendEmail",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.gmail}}"
+      },
+      "mapper": {
+        "to": "{{env.MY_EMAIL}}",
+        "subject": "💬 Log proposal for {{5.records[].fields.Name}}",
+        "content": "Your breakthrough session with {{5.records[].fields.Name}} just ended.\n\nDon't forget to log:\n• Propose Amount\n• Yes/No response (Proposal Response field)\n\nDirect link to their record:\nhttps://airtable.com/{{env.AIRTABLE_BASE_ID}}/Contacts/{{5.records[].id}}\n\nCompany: {{ifempty(5.records[].fields.Company; '—')}}\nRole: {{ifempty(5.records[].fields.Role; '—')}}\nEmail: {{5.records[].fields.Email}}",
+        "contentType": "text"
+      },
+      "metadata": {
+        "designer": { "x": 1200, "y": 0 }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] },
+    "zone": "us1.make.com"
+  }
+}

@@ -1,0 +1,242 @@
+{
+  "name": "05 — Stripe Payment → SERVE Stage + Engagement Record",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": "{{connection.webhook}}",
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": {},
+        "notes": "Receives Stripe payment_intent.succeeded or checkout.session.completed webhook. Copy this webhook URL into your Stripe Dashboard → Developers → Webhooks."
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:Router",
+      "version": 1,
+      "parameters": {},
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 200, "y": 0 }
+      },
+      "routes": [
+        {
+          "label": "payment_intent.succeeded",
+          "filter": {
+            "name": "payment_intent.succeeded",
+            "conditions": [
+              [{ "a": "{{1.body.type}}", "b": "payment_intent.succeeded", "o": "text:equal" }]
+            ]
+          },
+          "flow": [
+            {
+              "id": 3,
+              "module": "builtin:SetVariable",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "name": "customerEmail",
+                "value": "{{1.body.data.object.receipt_email}}",
+                "scope": "roundtrip"
+              },
+              "metadata": { "designer": { "x": 400, "y": -120 } }
+            },
+            {
+              "id": 4,
+              "module": "builtin:SetVariable",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "name": "amountDollars",
+                "value": "{{divide(1.body.data.object.amount_received; 100)}}",
+                "scope": "roundtrip"
+              },
+              "metadata": { "designer": { "x": 600, "y": -120 } }
+            },
+            {
+              "id": 5,
+              "module": "builtin:SetVariable",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "name": "paymentIntentId",
+                "value": "{{1.body.data.object.id}}",
+                "scope": "roundtrip"
+              },
+              "metadata": { "designer": { "x": 800, "y": -120 } }
+            }
+          ]
+        },
+        {
+          "label": "checkout.session.completed",
+          "filter": {
+            "name": "checkout.session.completed",
+            "conditions": [
+              [{ "a": "{{1.body.type}}", "b": "checkout.session.completed", "o": "text:equal" }]
+            ]
+          },
+          "flow": [
+            {
+              "id": 6,
+              "module": "builtin:SetVariable",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "name": "customerEmail",
+                "value": "{{1.body.data.object.customer_details.email}}",
+                "scope": "roundtrip"
+              },
+              "metadata": { "designer": { "x": 400, "y": 120 } }
+            },
+            {
+              "id": 7,
+              "module": "builtin:SetVariable",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "name": "amountDollars",
+                "value": "{{divide(1.body.data.object.amount_total; 100)}}",
+                "scope": "roundtrip"
+              },
+              "metadata": { "designer": { "x": 600, "y": 120 } }
+            },
+            {
+              "id": 8,
+              "module": "builtin:SetVariable",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "name": "paymentIntentId",
+                "value": "{{1.body.data.object.payment_intent}}",
+                "scope": "roundtrip"
+              },
+              "metadata": { "designer": { "x": 800, "y": 120 } }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "module": "airtable:ActionSearchRecords",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.airtable}}",
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "filterByFormula": "LOWER({Email}) = LOWER('{{customerEmail}}')",
+        "maxRecords": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 1000, "y": 0 }
+      }
+    },
+    {
+      "id": 10,
+      "module": "builtin:Filter",
+      "version": 1,
+      "parameters": {
+        "label": "Contact found",
+        "condition": {
+          "a": "{{9.total}}",
+          "b": "0",
+          "o": "number:greater"
+        }
+      },
+      "mapper": {},
+      "metadata": { "designer": { "x": 1200, "y": 0 } }
+    },
+    {
+      "id": 11,
+      "module": "airtable:ActionUpdateRecord",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.airtable}}",
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "id": "{{9.records[].id}}"
+      },
+      "mapper": {
+        "Stage": "SERVE",
+        "Fee": "{{amountDollars}}",
+        "Last Interaction": "{{formatDate(now; 'YYYY-MM-DD')}}"
+      },
+      "metadata": {
+        "designer": { "x": 1400, "y": 0 }
+      }
+    },
+    {
+      "id": 12,
+      "module": "airtable:ActionCreateRecord",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.airtable}}",
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Engagements"
+      },
+      "mapper": {
+        "Engagement Name": "{{9.records[].fields.Name}} — {{formatDate(now; 'YYYY-MM-DD')}}",
+        "Contact": ["{{9.records[].id}}"],
+        "Fee": "{{amountDollars}}",
+        "Start Date": "{{formatDate(now; 'YYYY-MM-DD')}}",
+        "Status": "Active",
+        "Stripe Payment ID": "{{paymentIntentId}}"
+      },
+      "metadata": {
+        "designer": { "x": 1600, "y": 0 }
+      }
+    },
+    {
+      "id": 13,
+      "module": "quickbooks:ActionCreateInvoice",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.quickbooks}}"
+      },
+      "mapper": {
+        "CustomerRef": {
+          "name": "{{9.records[].fields.Name}}",
+          "email": "{{customerEmail}}"
+        },
+        "Line": [
+          {
+            "Amount": "{{amountDollars}}",
+            "DetailType": "SalesItemLineDetail",
+            "SalesItemLineDetail": {
+              "ItemRef": { "name": "Coaching Services" }
+            }
+          }
+        ],
+        "DueDate": "{{formatDate(now; 'YYYY-MM-DD')}}"
+      },
+      "metadata": {
+        "designer": { "x": 1800, "y": 0 },
+        "notes": "Requires QuickBooks connection. Configure ItemRef to match your QB item name."
+      }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] },
+    "zone": "us1.make.com"
+  }
+}

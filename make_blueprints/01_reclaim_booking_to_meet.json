@@ -1,0 +1,223 @@
+{
+  "name": "01 — Reclaim Booking → MEET Stage",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gmail:TriggerNewEmail",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.gmail}}",
+        "folder": "INBOX",
+        "criteria": "from:reclaim.ai OR (subject:confirmed subject:booking)",
+        "markAsRead": false,
+        "maxResults": 10
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": {},
+        "parameters": [
+          { "name": "account", "type": "account:google", "label": "Gmail Connection" },
+          { "name": "folder", "type": "text", "label": "Folder" },
+          { "name": "criteria", "type": "text", "label": "Filter Criteria" },
+          { "name": "markAsRead", "type": "boolean", "label": "Mark as Read" },
+          { "name": "maxResults", "type": "number", "label": "Max Results" }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "array": "{{1.payload}}"
+      },
+      "metadata": {
+        "designer": { "x": 200, "y": 0 },
+        "restore": {}
+      }
+    },
+    {
+      "id": 3,
+      "module": "regexp:Parser",
+      "version": 1,
+      "parameters": {
+        "pattern": "(?:Name|Attendee)[:\\s]+([^\\n]+)",
+        "global": false,
+        "sensitive": false,
+        "multiline": true,
+        "singleline": false
+      },
+      "mapper": {
+        "text": "{{1.snippet}}"
+      },
+      "metadata": {
+        "designer": { "x": 400, "y": 0 },
+        "restore": {},
+        "notes": "Extract attendee name from email body"
+      }
+    },
+    {
+      "id": 4,
+      "module": "regexp:Parser",
+      "version": 1,
+      "parameters": {
+        "pattern": "[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}",
+        "global": false,
+        "sensitive": false,
+        "multiline": false,
+        "singleline": false
+      },
+      "mapper": {
+        "text": "{{1.snippet}}"
+      },
+      "metadata": {
+        "designer": { "x": 600, "y": 0 },
+        "restore": {},
+        "notes": "Extract attendee email from email body"
+      }
+    },
+    {
+      "id": 5,
+      "module": "regexp:Parser",
+      "version": 1,
+      "parameters": {
+        "pattern": "(\\d{4}-\\d{2}-\\d{2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \\d{1,2},? \\d{4})",
+        "global": false,
+        "sensitive": false,
+        "multiline": false,
+        "singleline": false
+      },
+      "mapper": {
+        "text": "{{1.snippet}}"
+      },
+      "metadata": {
+        "designer": { "x": 800, "y": 0 },
+        "restore": {},
+        "notes": "Extract meeting date from email body"
+      }
+    },
+    {
+      "id": 6,
+      "module": "airtable:ActionSearchRecords",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.airtable}}",
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "filterByFormula": "{{LOWER({Email}) = LOWER('}}{{4.$0}}{{')}}",
+        "maxRecords": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 1000, "y": 0 },
+        "restore": {}
+      }
+    },
+    {
+      "id": 7,
+      "module": "builtin:Router",
+      "version": 1,
+      "parameters": {},
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 1200, "y": 0 }
+      },
+      "routes": [
+        {
+          "label": "Record found — update",
+          "filter": {
+            "name": "Record found",
+            "conditions": [
+              [{ "a": "{{6.total}}", "b": "0", "o": "number:greater" }]
+            ]
+          },
+          "flow": [
+            {
+              "id": 8,
+              "module": "airtable:ActionUpdateRecord",
+              "version": 1,
+              "parameters": {
+                "account": "{{connection.airtable}}",
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "id": "{{6.records[].id}}"
+              },
+              "mapper": {
+                "Stage": "MEET",
+                "Meeting Date": "{{5.$0}}",
+                "Last Interaction": "{{formatDate(now; 'YYYY-MM-DD')}}",
+                "Meeting Type": "Reclaim"
+              },
+              "metadata": { "designer": { "x": 1400, "y": -100 } }
+            }
+          ]
+        },
+        {
+          "label": "Record NOT found — create",
+          "filter": {
+            "name": "Record not found",
+            "conditions": [
+              [{ "a": "{{6.total}}", "b": "0", "o": "number:equal" }]
+            ]
+          },
+          "flow": [
+            {
+              "id": 9,
+              "module": "airtable:ActionCreateRecord",
+              "version": 1,
+              "parameters": {
+                "account": "{{connection.airtable}}",
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts"
+              },
+              "mapper": {
+                "Name": "{{3.$1}}",
+                "Email": "{{4.$0}}",
+                "Stage": "MEET",
+                "Meeting Date": "{{5.$0}}",
+                "Last Interaction": "{{formatDate(now; 'YYYY-MM-DD')}}",
+                "Meeting Type": "Reclaim"
+              },
+              "metadata": { "designer": { "x": 1400, "y": 100 } }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "module": "gmail:ActionAddLabel",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.gmail}}",
+        "messageId": "{{1.id}}",
+        "labelIds": ["CRM: Processed"]
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 1600, "y": 0 },
+        "restore": {},
+        "notes": "Label email as processed. Create 'CRM: Processed' label in Gmail first."
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] },
+    "zone": "us1.make.com"
+  }
+}

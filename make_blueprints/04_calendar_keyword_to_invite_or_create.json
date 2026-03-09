@@ -1,0 +1,201 @@
+{
+  "name": "04 — Calendar Event Keywords → INVITE or CREATE Stage",
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-calendar:TriggerWatchEvents",
+      "version": 3,
+      "parameters": {
+        "account": "{{connection.google-calendar}}",
+        "calendarId": "primary",
+        "watchNewEvents": true,
+        "watchUpdatedEvents": true
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": {},
+        "notes": "Watches primary calendar for new or updated events every 15 minutes."
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:Router",
+      "version": 1,
+      "parameters": {},
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 200, "y": 0 }
+      },
+      "routes": [
+        {
+          "label": "Title contains 'two-hour-intensive' → INVITE",
+          "filter": {
+            "name": "two-hour-intensive keyword",
+            "conditions": [
+              [
+                {
+                  "a": "{{lower(1.summary)}}",
+                  "b": "two-hour-intensive",
+                  "o": "text:contain"
+                }
+              ]
+            ]
+          },
+          "flow": [
+            {
+              "id": 3,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "array": "{{1.attendees}}"
+              },
+              "metadata": {
+                "designer": { "x": 400, "y": -150 },
+                "notes": "Iterate over event attendees."
+              }
+            },
+            {
+              "id": 4,
+              "module": "airtable:ActionSearchRecords",
+              "version": 1,
+              "parameters": {
+                "account": "{{connection.airtable}}",
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "filterByFormula": "LOWER({Email}) = LOWER('{{3.email}}')",
+                "maxRecords": 1
+              },
+              "mapper": {},
+              "metadata": { "designer": { "x": 600, "y": -150 } }
+            },
+            {
+              "id": 5,
+              "module": "builtin:Filter",
+              "version": 1,
+              "parameters": {
+                "label": "Contact found",
+                "condition": {
+                  "a": "{{4.total}}",
+                  "b": "0",
+                  "o": "number:greater"
+                }
+              },
+              "mapper": {},
+              "metadata": { "designer": { "x": 800, "y": -150 } }
+            },
+            {
+              "id": 6,
+              "module": "airtable:ActionUpdateRecord",
+              "version": 1,
+              "parameters": {
+                "account": "{{connection.airtable}}",
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "id": "{{4.records[].id}}"
+              },
+              "mapper": {
+                "Stage": "INVITE",
+                "Last Interaction": "{{formatDate(now; 'YYYY-MM-DD')}}"
+              },
+              "metadata": { "designer": { "x": 1000, "y": -150 } }
+            }
+          ]
+        },
+        {
+          "label": "Title contains 'breakthrough' → CREATE",
+          "filter": {
+            "name": "breakthrough keyword",
+            "conditions": [
+              [
+                {
+                  "a": "{{lower(1.summary)}}",
+                  "b": "breakthrough",
+                  "o": "text:contain"
+                }
+              ]
+            ]
+          },
+          "flow": [
+            {
+              "id": 7,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "array": "{{1.attendees}}"
+              },
+              "metadata": {
+                "designer": { "x": 400, "y": 150 },
+                "notes": "Iterate over event attendees."
+              }
+            },
+            {
+              "id": 8,
+              "module": "airtable:ActionSearchRecords",
+              "version": 1,
+              "parameters": {
+                "account": "{{connection.airtable}}",
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "filterByFormula": "LOWER({Email}) = LOWER('{{7.email}}')",
+                "maxRecords": 1
+              },
+              "mapper": {},
+              "metadata": { "designer": { "x": 600, "y": 150 } }
+            },
+            {
+              "id": 9,
+              "module": "builtin:Filter",
+              "version": 1,
+              "parameters": {
+                "label": "Contact found",
+                "condition": {
+                  "a": "{{8.total}}",
+                  "b": "0",
+                  "o": "number:greater"
+                }
+              },
+              "mapper": {},
+              "metadata": { "designer": { "x": 800, "y": 150 } }
+            },
+            {
+              "id": 10,
+              "module": "airtable:ActionUpdateRecord",
+              "version": 1,
+              "parameters": {
+                "account": "{{connection.airtable}}",
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "id": "{{8.records[].id}}"
+              },
+              "mapper": {
+                "Stage": "CREATE",
+                "Last Interaction": "{{formatDate(now; 'YYYY-MM-DD')}}"
+              },
+              "metadata": { "designer": { "x": 1000, "y": 150 } }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] },
+    "zone": "us1.make.com"
+  }
+}

@@ -1,0 +1,212 @@
+{
+  "name": "07 — Zoom Meeting Ended → Append Summary to Contacts",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": "{{connection.webhook}}",
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": {},
+        "notes": "Receives Zoom meeting.ended webhook. Copy webhook URL into Zoom App Marketplace → Feature → Event Subscriptions."
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:Filter",
+      "version": 1,
+      "parameters": {
+        "label": "Event is meeting.ended",
+        "condition": {
+          "a": "{{1.body.event}}",
+          "b": "meeting.ended",
+          "o": "text:equal"
+        }
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 200, "y": 0 }
+      }
+    },
+    {
+      "id": 3,
+      "module": "builtin:SetVariable",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "name": "meetingUUID",
+        "value": "{{1.body.payload.object.uuid}}",
+        "scope": "roundtrip"
+      },
+      "metadata": { "designer": { "x": 400, "y": 0 } }
+    },
+    {
+      "id": 4,
+      "module": "builtin:SetVariable",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "name": "hostEmail",
+        "value": "{{1.body.payload.object.host_email}}",
+        "scope": "roundtrip"
+      },
+      "metadata": { "designer": { "x": 600, "y": 0 } }
+    },
+    {
+      "id": 5,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": true,
+        "useNewZLibDecompression": true
+      },
+      "mapper": {
+        "url": "https://api.zoom.us/v2/meetings/{{encodeURL(meetingUUID)}}/meeting_summary",
+        "method": "GET",
+        "headers": [
+          { "name": "Authorization", "value": "Bearer {{env.ZOOM_ACCESS_TOKEN}}" }
+        ]
+      },
+      "metadata": {
+        "designer": { "x": 800, "y": 0 },
+        "notes": "Retrieve Zoom AI Companion meeting summary. Requires ZOOM_ACCESS_TOKEN env var."
+      }
+    },
+    {
+      "id": 6,
+      "module": "json:ParseJSON",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "json": "{{5.data}}"
+      },
+      "metadata": { "designer": { "x": 1000, "y": 0 } }
+    },
+    {
+      "id": 7,
+      "module": "builtin:SetVariable",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "name": "meetingSummary",
+        "value": "{{ifempty(6.summary_details.summary; 'No AI summary available.')}}",
+        "scope": "roundtrip"
+      },
+      "metadata": { "designer": { "x": 1200, "y": 0 } }
+    },
+    {
+      "id": 8,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "array": "{{1.body.payload.object.participant_user_emails}}"
+      },
+      "metadata": {
+        "designer": { "x": 1400, "y": 0 },
+        "notes": "Iterate over participant emails. Note: Zoom webhooks may include participants via /past_meetings/{meetingId}/participants endpoint instead."
+      }
+    },
+    {
+      "id": 9,
+      "module": "builtin:Filter",
+      "version": 1,
+      "parameters": {
+        "label": "Exclude host email",
+        "condition": {
+          "a": "{{lower(8.value)}}",
+          "b": "{{lower(hostEmail)}}",
+          "o": "text:notequal"
+        }
+      },
+      "mapper": {},
+      "metadata": { "designer": { "x": 1600, "y": 0 } }
+    },
+    {
+      "id": 10,
+      "module": "airtable:ActionSearchRecords",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.airtable}}",
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "filterByFormula": "LOWER({Email}) = LOWER('{{8.value}}')",
+        "maxRecords": 1
+      },
+      "mapper": {},
+      "metadata": { "designer": { "x": 1800, "y": 0 } }
+    },
+    {
+      "id": 11,
+      "module": "builtin:Filter",
+      "version": 1,
+      "parameters": {
+        "label": "Contact found",
+        "condition": {
+          "a": "{{10.total}}",
+          "b": "0",
+          "o": "number:greater"
+        }
+      },
+      "mapper": {},
+      "metadata": { "designer": { "x": 2000, "y": 0 } }
+    },
+    {
+      "id": 12,
+      "module": "airtable:ActionUpdateRecord",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.airtable}}",
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "id": "{{10.records[].id}}"
+      },
+      "mapper": {
+        "Meeting Summary": "{{meetingSummary}}",
+        "Last Interaction": "{{formatDate(now; 'YYYY-MM-DD')}}",
+        "Comments": "{{ifempty(10.records[].fields.Comments; '')}}---\nZoom Meeting: {{formatDate(now; 'YYYY-MM-DD')}}\n{{meetingSummary}}"
+      },
+      "metadata": { "designer": { "x": 2200, "y": 0 } }
+    },
+    {
+      "id": 13,
+      "module": "gmail:ActionSendEmail",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.gmail}}"
+      },
+      "mapper": {
+        "to": "{{env.MY_EMAIL}}",
+        "subject": "📋 Zoom Summary — {{1.body.payload.object.topic}} ({{formatDate(now; 'YYYY-MM-DD')}})",
+        "content": "Meeting: {{1.body.payload.object.topic}}\nDate: {{formatDate(now; 'YYYY-MM-DD HH:mm')}}\nDuration: {{1.body.payload.object.duration}} min\n\nSummary:\n{{meetingSummary}}\n\nRecords updated in Airtable.",
+        "contentType": "text"
+      },
+      "metadata": {
+        "designer": { "x": 2400, "y": 0 },
+        "notes": "Sends summary notification to yourself. Set MY_EMAIL in Make environment variables."
+      }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] },
+    "zone": "us1.make.com"
+  }
+}

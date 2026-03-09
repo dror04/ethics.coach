@@ -1,0 +1,23 @@
+{
+  "name": "ethics-coach-crm",
+  "version": "1.0.0",
+  "description": "Airtable CRM system for Ethics.Coach executive coaching practice",
+  "main": "setup_airtable.js",
+  "scripts": {
+    "setup": "node setup_airtable.js",
+    "validate": "node validate_setup.js",
+    "import": "node import_monday.js",
+    "parse-card": "node parse_business_card.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "csv-parse": "^5.5.0",
+    "dotenv": "^16.3.1",
+    "form-data": "^4.0.0",
+    "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}

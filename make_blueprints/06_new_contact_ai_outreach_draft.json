@@ -1,0 +1,109 @@
+{
+  "name": "06 — New Contact → AI Outreach Email Draft",
+  "flow": [
+    {
+      "id": 1,
+      "module": "airtable:TriggerNewRecord",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.airtable}}",
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "view": "All Contacts"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": {},
+        "notes": "Watches Contacts table for new records. Runs every scheduled interval."
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:Filter",
+      "version": 1,
+      "parameters": {
+        "label": "Stage = NEW and Draft Outreach Email is empty",
+        "condition": {
+          "a": "{{and(1.fields.Stage = 'NEW'; isEmpty(1.fields['Draft Outreach Email']))}}",
+          "b": "true",
+          "o": "boolean:equal"
+        }
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 200, "y": 0 }
+      }
+    },
+    {
+      "id": 3,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": true,
+        "useNewZLibDecompression": true
+      },
+      "mapper": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "headers": [
+          { "name": "x-api-key",          "value": "{{env.ANTHROPIC_API_KEY}}" },
+          { "name": "anthropic-version",  "value": "2023-06-01" },
+          { "name": "Content-Type",       "value": "application/json" }
+        ],
+        "body": "{{toJSON({\n  \"model\": \"claude-sonnet-4-20250514\",\n  \"max_tokens\": 512,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": concat(\"You are writing a warm, personalized outreach email on behalf of an executive ethics coach.\\nContact name: \"; 1.fields.Name; \"\\nCompany: \"; ifempty(1.fields.Company; '(unknown)'); \"\\nRole: \"; ifempty(1.fields.Role; '(unknown)'); \"\\nSource (where we met): \"; ifempty(join(1.fields.Source; ', '); '(not specified)'); \"\\n\\nWrite a short, genuine outreach email (3-4 sentences max).\\n- Warm but not sycophantic\\n- Reference the source/context naturally\\n- No hard sell — just open a conversation\\n- Sign off as 'Dror'\\nReturn ONLY the email body text, no subject line, no explanation.\")\n    }\n  ]\n})}}"
+      },
+      "metadata": {
+        "designer": { "x": 400, "y": 0 },
+        "restore": {},
+        "notes": "HTTP POST to Anthropic Claude API. ANTHROPIC_API_KEY must be set in Make.com environment variables or replace with your key."
+      }
+    },
+    {
+      "id": 4,
+      "module": "json:ParseJSON",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "json": "{{3.data}}"
+      },
+      "metadata": {
+        "designer": { "x": 600, "y": 0 }
+      }
+    },
+    {
+      "id": 5,
+      "module": "airtable:ActionUpdateRecord",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.airtable}}",
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "id": "{{1.id}}"
+      },
+      "mapper": {
+        "Draft Outreach Email": "{{4.content[].text}}"
+      },
+      "metadata": {
+        "designer": { "x": 800, "y": 0 }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] },
+    "zone": "us1.make.com"
+  }
+}

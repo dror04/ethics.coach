@@ -1,0 +1,133 @@
+{
+  "name": "02 — Gmail Reply → CONNECT Stage",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gmail:TriggerNewEmail",
+      "version": 1,
+      "parameters": {
+        "account": "{{connection.gmail}}",
+        "folder": "INBOX",
+        "criteria": "in:inbox",
+        "markAsRead": false,
+        "maxResults": 10
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": {},
+        "notes": "Watches inbox for incoming replies. Filter for In-Reply-To header applied in Router."
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:Router",
+      "version": 1,
+      "parameters": {},
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 200, "y": 0 }
+      },
+      "routes": [
+        {
+          "label": "Is a reply and not from self",
+          "filter": {
+            "name": "Is reply (has In-Reply-To), not from self",
+            "conditions": [
+              [
+                { "a": "{{1.headers['in-reply-to']}}", "b": "", "o": "text:notequal" },
+                { "a": "{{1.from.address}}", "b": "{{env.MY_EMAIL}}", "o": "text:notequal" }
+              ]
+            ]
+          },
+          "flow": [
+            {
+              "id": 3,
+              "module": "airtable:ActionSearchRecords",
+              "version": 1,
+              "parameters": {
+                "account": "{{connection.airtable}}",
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "filterByFormula": "AND(LOWER({Email}) = LOWER('{{1.from.address}}'), {Stage} = 'OUTREACH')",
+                "maxRecords": 1
+              },
+              "mapper": {},
+              "metadata": {
+                "designer": { "x": 400, "y": 0 }
+              }
+            },
+            {
+              "id": 4,
+              "module": "builtin:Router",
+              "version": 1,
+              "parameters": {},
+              "mapper": {},
+              "metadata": {
+                "designer": { "x": 600, "y": 0 }
+              },
+              "routes": [
+                {
+                  "label": "Contact found in OUTREACH",
+                  "filter": {
+                    "name": "Contact found",
+                    "conditions": [
+                      [{ "a": "{{3.total}}", "b": "0", "o": "number:greater" }]
+                    ]
+                  },
+                  "flow": [
+                    {
+                      "id": 5,
+                      "module": "airtable:ActionUpdateRecord",
+                      "version": 1,
+                      "parameters": {
+                        "account": "{{connection.airtable}}",
+                        "base": "{{env.AIRTABLE_BASE_ID}}",
+                        "table": "Contacts",
+                        "id": "{{3.records[].id}}"
+                      },
+                      "mapper": {
+                        "Stage": "CONNECT",
+                        "Last Interaction": "{{formatDate(now; 'YYYY-MM-DD')}}"
+                      },
+                      "metadata": { "designer": { "x": 800, "y": -80 } }
+                    },
+                    {
+                      "id": 6,
+                      "module": "gmail:ActionAddLabel",
+                      "version": 1,
+                      "parameters": {
+                        "account": "{{connection.gmail}}",
+                        "messageId": "{{1.id}}",
+                        "labelIds": ["CRM: Processed"]
+                      },
+                      "mapper": {},
+                      "metadata": { "designer": { "x": 1000, "y": -80 } }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] },
+    "zone": "us1.make.com"
+  }
+}
