@@ -227,39 +227,9 @@ async function main() {
     if (field.name === "Contact") contactLinkFieldId = created.id;
   }
 
-  // Add lookup fields for Contact Name and Contact Email
-  if (contactLinkFieldId) {
-    // Find the Name and Email field IDs in Contacts table
-    const refreshedTables = await apiCall("get", tablesUrl);
-    const refreshedContacts = refreshedTables.tables.find((t) => t.name === "Contacts");
-    const nameFieldId = refreshedContacts.fields.find((f) => f.name === "Name")?.id;
-    const emailFieldId = refreshedContacts.fields.find((f) => f.name === "Email")?.id;
-
-    const lookups = [
-      { name: "Contact Name", fieldIdInLinkedTable: nameFieldId },
-      { name: "Contact Email", fieldIdInLinkedTable: emailFieldId },
-    ];
-
-    for (const lk of lookups) {
-      if (engExistingFields.has(lk.name)) {
-        console.log(`  ⏭  ${lk.name} (already exists)`);
-        continue;
-      }
-      if (!lk.fieldIdInLinkedTable) {
-        console.log(`  ⚠️  Skipping ${lk.name} — source field not found`);
-        continue;
-      }
-      await apiCall("post", `${tablesUrl}/${engTableId}/fields`, {
-        name: lk.name,
-        type: "lookup",
-        options: {
-          fieldIdInLinkedTable: lk.fieldIdInLinkedTable,
-          recordLinkFieldId: contactLinkFieldId,
-        },
-      });
-      console.log(`  ✅ ${lk.name} (lookup)`);
-    }
-  }
+  // Lookup fields can't be created via API — add manually
+  console.log("  ⏭️  Skipping 'Contact Name' (lookup) — add manually in Airtable UI");
+  console.log("  ⏭️  Skipping 'Contact Email' (lookup) — add manually in Airtable UI");
 
   console.log("");
 
@@ -341,8 +311,10 @@ async function main() {
   console.log("  2. Contacts → Add 'Modified' field (type: Last modified time)");
   console.log("  3. Contacts → 'Sessions Remaining': convert to Formula → {Sessions} - {Sessions Completed}");
   console.log("  4. Engagements → Add 'Created' field (type: Created time)");
-  console.log("  5. Engagements → 'Sessions Remaining': convert to Formula → {Sessions Contracted} - {Sessions Completed}");
-  console.log("  6. Some views may require manual filter/sort configuration in Airtable UI.");
+  console.log("  5. Engagements → Add 'Contact Name' field (type: Lookup → Contact → Name)");
+  console.log("  6. Engagements → Add 'Contact Email' field (type: Lookup → Contact → Email)");
+  console.log("  7. Engagements → 'Sessions Remaining': convert to Formula → {Sessions Contracted} - {Sessions Completed}");
+  console.log("  8. Some views may require manual filter/sort configuration in Airtable UI.");
   console.log("See README.md for view filter specifications.\n");
 }
 
