@@ -25,18 +25,18 @@ const STAGE_OPTIONS = [
   { name: "INVITE", color: "orangeBright" },
   { name: "CREATE", color: "purpleBright" },
   { name: "PROPOSE", color: "pinkBright" },
-  { name: "SERVE", color: "greenDark" },
-  { name: "NURTURE", color: "yellowLight" },
-  { name: "BACK BURNER", color: "grayLight" },
+  { name: "SERVE", color: "greenDark1" },
+  { name: "NURTURE", color: "yellowLight1" },
+  { name: "BACK BURNER", color: "grayLight1" },
   { name: "ARCHIVE", color: "grayBright" },
-  { name: "PARTNER", color: "tealDark" },
+  { name: "PARTNER", color: "tealDark1" },
 ];
 
 const SELECT_COLORS = [
   "blueBright", "cyanBright", "tealBright", "greenBright", "yellowBright",
   "orangeBright", "redBright", "pinkBright", "purpleBright", "grayBright",
-  "blueDark", "cyanDark", "tealDark", "greenDark", "yellowDark",
-  "orangeDark", "redDark", "pinkDark",
+  "blueDark1", "cyanDark1", "tealDark1", "greenDark1", "yellowDark1",
+  "orangeDark1", "redDark1", "pinkDark1",
 ];
 
 const SOURCE_OPTIONS = [
