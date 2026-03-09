@@ -162,16 +162,9 @@ async function main() {
     console.log(`  ✅ ${field.name}`);
   }
 
-  // Add auto-timestamp fields
-  for (const autoField of [
-    { name: "Created", type: "createdTime" },
-    { name: "Modified", type: "lastModifiedTime" },
-  ]) {
-    if (!existingFieldNames.has(autoField.name)) {
-      await apiCall("post", `${tablesUrl}/${contactsTableId}/fields`, autoField);
-      console.log(`  ✅ ${autoField.name}`);
-    }
-  }
+  // createdTime and lastModifiedTime fields can't be created via API — add manually
+  console.log("  ⏭️  Skipping 'Created' (createdTime) — add manually in Airtable UI");
+  console.log("  ⏭️  Skipping 'Modified' (lastModifiedTime) — add manually in Airtable UI");
 
   console.log("");
 
@@ -213,7 +206,7 @@ async function main() {
     { name: "Stripe Payment ID", type: "singleLineText" },
     { name: "Stripe Link", type: "url" },
     { name: "Notes", type: "multilineText" },
-    { name: "Created", type: "createdTime" },
+    // createdTime can't be created via API — add manually
   ];
 
   // Create the Contact link field first so we can reference it for lookups
@@ -344,9 +337,12 @@ async function main() {
   console.log(`Contacts Table ID: ${contactsTableId}`);
   console.log(`Engagements Table ID: ${engTableId}`);
   console.log("\nManual steps needed:");
-  console.log("  1. Contacts → 'Sessions Remaining': convert to Formula → {Sessions} - {Sessions Completed}");
-  console.log("  2. Engagements → 'Sessions Remaining': convert to Formula → {Sessions Contracted} - {Sessions Completed}");
-  console.log("  3. Some views may require manual filter/sort configuration in Airtable UI.");
+  console.log("  1. Contacts → Add 'Created' field (type: Created time)");
+  console.log("  2. Contacts → Add 'Modified' field (type: Last modified time)");
+  console.log("  3. Contacts → 'Sessions Remaining': convert to Formula → {Sessions} - {Sessions Completed}");
+  console.log("  4. Engagements → Add 'Created' field (type: Created time)");
+  console.log("  5. Engagements → 'Sessions Remaining': convert to Formula → {Sessions Contracted} - {Sessions Completed}");
+  console.log("  6. Some views may require manual filter/sort configuration in Airtable UI.");
   console.log("See README.md for view filter specifications.\n");
 }
 
