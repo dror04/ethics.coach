@@ -32,20 +32,27 @@ const STAGE_OPTIONS = [
   { name: "PARTNER", color: "tealDark" },
 ];
 
+const SELECT_COLORS = [
+  "blueBright", "cyanBright", "tealBright", "greenBright", "yellowBright",
+  "orangeBright", "redBright", "pinkBright", "purpleBright", "grayBright",
+  "blueDark", "cyanDark", "tealDark", "greenDark", "yellowDark",
+  "orangeDark", "redDark", "pinkDark",
+];
+
 const SOURCE_OPTIONS = [
   "AMA", "JEI", "SVI", "IMMA", "Zebras", "Berlin", "BASE",
   "Climate-Week", "POD 2025", "C-Suite SusPGH", "RISC",
   "PGH Tomorrow", "Amy Wilson", "Newsletter",
   "Scheduling Link", "Referral", "LinkedIn", "Other",
-].map((name) => ({ name }));
+].map((name, i) => ({ name, color: SELECT_COLORS[i % SELECT_COLORS.length] }));
 
 const CONTACTS_FIELDS = [
   // Primary field "Name" is created with the table
   { name: "First Name", type: "singleLineText" },
   { name: "Email", type: "email" },
   { name: "Phone", type: "phoneNumber" },
-  { name: "LinkedIn", type: "checkbox", options: { icon: "check" } },
-  { name: "Newsletter", type: "checkbox", options: { icon: "check" } },
+  { name: "LinkedIn", type: "checkbox", options: { icon: "check", color: "greenBright" } },
+  { name: "Newsletter", type: "checkbox", options: { icon: "check", color: "greenBright" } },
   { name: "Location", type: "singleLineText" },
   { name: "Company", type: "singleLineText" },
   { name: "Role", type: "singleLineText" },
@@ -53,12 +60,12 @@ const CONTACTS_FIELDS = [
   { name: "Stage", type: "singleSelect", options: { choices: STAGE_OPTIONS } },
   { name: "Last Interaction", type: "date", options: { dateFormat: { name: "iso" } } },
   { name: "Meeting Date", type: "date", options: { dateFormat: { name: "iso" } } },
-  { name: "Meeting Type", type: "singleSelect", options: { choices: [{ name: "Zoom" }, { name: "In-Person" }, { name: "Phone" }, { name: "Reclaim" }] } },
+  { name: "Meeting Type", type: "singleSelect", options: { choices: [{ name: "Zoom", color: "blueBright" }, { name: "In-Person", color: "greenBright" }, { name: "Phone", color: "yellowBright" }, { name: "Reclaim", color: "purpleBright" }] } },
   { name: "Meeting Summary", type: "multilineText" },
   { name: "Source", type: "multipleSelects", options: { choices: SOURCE_OPTIONS } },
   { name: "Propose Amount", type: "currency", options: { precision: 2, symbol: "$" } },
-  { name: "Proposal Response", type: "singleSelect", options: { choices: [{ name: "Yes" }, { name: "No" }, { name: "Pending" }] } },
-  { name: "Demo Offered", type: "checkbox", options: { icon: "check" } },
+  { name: "Proposal Response", type: "singleSelect", options: { choices: [{ name: "Yes", color: "greenBright" }, { name: "No", color: "redBright" }, { name: "Pending", color: "yellowBright" }] } },
+  { name: "Demo Offered", type: "checkbox", options: { icon: "check", color: "greenBright" } },
   { name: "Demo Date", type: "date", options: { dateFormat: { name: "iso" } } },
   { name: "Contract Date", type: "date", options: { dateFormat: { name: "iso" } } },
   { name: "Fee", type: "currency", options: { precision: 2, symbol: "$" } },
@@ -66,7 +73,7 @@ const CONTACTS_FIELDS = [
   { name: "Sessions Completed", type: "number", options: { precision: 0 } },
   { name: "Sessions Remaining", type: "formula", options: { formula: "{Sessions} - {Sessions Completed}" } },
   { name: "Hours Worked", type: "number", options: { precision: 2 } },
-  { name: "Payment Type", type: "singleSelect", options: { choices: [{ name: "One-Time" }, { name: "Monthly Recurring" }] } },
+  { name: "Payment Type", type: "singleSelect", options: { choices: [{ name: "One-Time", color: "blueBright" }, { name: "Monthly Recurring", color: "purpleBright" }] } },
   { name: "Expiration Date", type: "date", options: { dateFormat: { name: "iso" } } },
   { name: "Contract", type: "multipleAttachments" },
   { name: "QB Invoice Number", type: "singleLineText" },
@@ -189,14 +196,14 @@ async function main() {
     { name: "Contact", type: "multipleRecordLinks", options: { linkedTableId: contactsTableId } },
     { name: "Start Date", type: "date", options: { dateFormat: { name: "iso" } } },
     { name: "End Date", type: "date", options: { dateFormat: { name: "iso" } } },
-    { name: "Status", type: "singleSelect", options: { choices: [{ name: "Active" }, { name: "Completed" }, { name: "Paused" }, { name: "Cancelled" }] } },
+    { name: "Status", type: "singleSelect", options: { choices: [{ name: "Active", color: "greenBright" }, { name: "Completed", color: "blueBright" }, { name: "Paused", color: "yellowBright" }, { name: "Cancelled", color: "redBright" }] } },
     { name: "Package", type: "singleLineText" },
     { name: "Fee", type: "currency", options: { precision: 2, symbol: "$" } },
     { name: "Sessions Contracted", type: "number", options: { precision: 0 } },
     { name: "Sessions Completed", type: "number", options: { precision: 0 } },
     { name: "Sessions Remaining", type: "formula", options: { formula: "{Sessions Contracted} - {Sessions Completed}" } },
     { name: "Hours Worked", type: "number", options: { precision: 2 } },
-    { name: "Payment Type", type: "singleSelect", options: { choices: [{ name: "One-Time" }, { name: "Monthly Recurring" }] } },
+    { name: "Payment Type", type: "singleSelect", options: { choices: [{ name: "One-Time", color: "blueBright" }, { name: "Monthly Recurring", color: "purpleBright" }] } },
     { name: "Contract Date", type: "date", options: { dateFormat: { name: "iso" } } },
     { name: "Expiration Date", type: "date", options: { dateFormat: { name: "iso" } } },
     { name: "Contract", type: "multipleAttachments" },
