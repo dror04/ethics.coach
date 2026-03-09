@@ -71,7 +71,8 @@ const CONTACTS_FIELDS = [
   { name: "Fee", type: "currency", options: { precision: 2, symbol: "$" } },
   { name: "Sessions", type: "number", options: { precision: 0 } },
   { name: "Sessions Completed", type: "number", options: { precision: 0 } },
-  { name: "Sessions Remaining", type: "formula", options: { formula: "{Sessions} - {Sessions Completed}" } },
+  // Formula fields can't be created via API — create as number, convert manually
+  { name: "Sessions Remaining", type: "number", options: { precision: 0 } },
   { name: "Hours Worked", type: "number", options: { precision: 2 } },
   { name: "Payment Type", type: "singleSelect", options: { choices: [{ name: "One-Time", color: "blueBright" }, { name: "Monthly Recurring", color: "purpleBright" }] } },
   { name: "Expiration Date", type: "date", options: { dateFormat: { name: "iso" } } },
@@ -201,7 +202,8 @@ async function main() {
     { name: "Fee", type: "currency", options: { precision: 2, symbol: "$" } },
     { name: "Sessions Contracted", type: "number", options: { precision: 0 } },
     { name: "Sessions Completed", type: "number", options: { precision: 0 } },
-    { name: "Sessions Remaining", type: "formula", options: { formula: "{Sessions Contracted} - {Sessions Completed}" } },
+    // Formula fields can't be created via API — create as number, convert manually
+    { name: "Sessions Remaining", type: "number", options: { precision: 0 } },
     { name: "Hours Worked", type: "number", options: { precision: 2 } },
     { name: "Payment Type", type: "singleSelect", options: { choices: [{ name: "One-Time", color: "blueBright" }, { name: "Monthly Recurring", color: "purpleBright" }] } },
     { name: "Contract Date", type: "date", options: { dateFormat: { name: "iso" } } },
@@ -341,7 +343,10 @@ async function main() {
   console.log(`\nBase ID: ${BASE_ID}`);
   console.log(`Contacts Table ID: ${contactsTableId}`);
   console.log(`Engagements Table ID: ${engTableId}`);
-  console.log("\nNote: Some views may require manual filter/sort configuration in Airtable UI.");
+  console.log("\nManual steps needed:");
+  console.log("  1. Contacts → 'Sessions Remaining': convert to Formula → {Sessions} - {Sessions Completed}");
+  console.log("  2. Engagements → 'Sessions Remaining': convert to Formula → {Sessions Contracted} - {Sessions Completed}");
+  console.log("  3. Some views may require manual filter/sort configuration in Airtable UI.");
   console.log("See README.md for view filter specifications.\n");
 }
 
