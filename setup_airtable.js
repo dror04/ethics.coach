@@ -233,72 +233,8 @@ async function main() {
 
   console.log("");
 
-  // ── Step 6: Create Views ──────────────────────────────────────────────────
-  console.log("Creating views...");
-
-  // Helper: get Stage field ID and choice IDs
-  const refreshedTables2 = await apiCall("get", tablesUrl);
-  const contactsRefreshed = refreshedTables2.tables.find((t) => t.name === "Contacts");
-  const stageField = contactsRefreshed.fields.find((f) => f.name === "Stage");
-  const sourceField = contactsRefreshed.fields.find((f) => f.name === "Source");
-  const createdField = contactsRefreshed.fields.find((f) => f.name === "Created");
-  const lastInteractionField = contactsRefreshed.fields.find((f) => f.name === "Last Interaction");
-
-  const engRefreshed = refreshedTables2.tables.find((t) => t.name === "Engagements");
-  const statusField = engRefreshed.fields.find((f) => f.name === "Status");
-  const expDateField = engRefreshed.fields.find((f) => f.name === "Expiration Date");
-  const startDateField = engRefreshed.fields.find((f) => f.name === "Start Date");
-
-  // Note: Airtable Meta API view creation is limited — we create grid views
-  // and note that filters/grouping may need manual setup for complex views
-  const viewsUrl = (tableId) => `https://api.airtable.com/v0/meta/bases/${BASE_ID}/views`;
-
-  // Contacts views
-  const contactViews = [
-    { name: "Funnel", type: "kanban" },
-    { name: "All Contacts", type: "grid" },
-    { name: "Active Pipeline", type: "grid" },
-    { name: "Clients — SERVE", type: "grid" },
-    { name: "Nurture List", type: "grid" },
-    { name: "Partners", type: "grid" },
-    { name: "SVI / SVN", type: "grid" },
-    { name: "New This Week", type: "grid" },
-  ];
-
-  // Airtable Meta API doesn't support direct view creation with filters via REST.
-  // We create the views and print instructions for manual filter setup.
-  // Use the table-level view creation endpoint.
-  for (const view of contactViews) {
-    try {
-      await apiCall("post", `${tablesUrl}/${contactsTableId}/views`, {
-        name: view.name,
-        type: view.type === "kanban" ? "kanban" : "grid",
-      });
-      console.log(`  ✅ Contacts → ${view.name}`);
-    } catch (e) {
-      // View may already exist or API may not support this
-      console.log(`  ⚠️  Contacts → ${view.name} (may need manual creation)`);
-    }
-  }
-
-  // Engagements views
-  const engViews = [
-    { name: "Active Engagements", type: "grid" },
-    { name: "All Engagements", type: "grid" },
-    { name: "Expiring Soon", type: "grid" },
-  ];
-
-  for (const view of engViews) {
-    try {
-      await apiCall("post", `${tablesUrl}/${engTableId}/views`, {
-        name: view.name,
-        type: "grid",
-      });
-      console.log(`  ✅ Engagements → ${view.name}`);
-    } catch (e) {
-      console.log(`  ⚠️  Engagements → ${view.name} (may need manual creation)`);
-    }
-  }
+  // ── Step 6: Views ───────────────────────────────────────────────────────
+  // Airtable Meta API does not support view creation — views must be added manually
 
   console.log("\n═══════════════════════════════════════════════");
   console.log("  Setup Complete!");
@@ -307,15 +243,28 @@ async function main() {
   console.log(`Contacts Table ID: ${contactsTableId}`);
   console.log(`Engagements Table ID: ${engTableId}`);
   console.log("\nManual steps needed:");
-  console.log("  1. Contacts → Add 'Created' field (type: Created time)");
-  console.log("  2. Contacts → Add 'Modified' field (type: Last modified time)");
-  console.log("  3. Contacts → 'Sessions Remaining': convert to Formula → {Sessions} - {Sessions Completed}");
-  console.log("  4. Engagements → Add 'Created' field (type: Created time)");
-  console.log("  5. Engagements → Add 'Contact Name' field (type: Lookup → Contact → Name)");
-  console.log("  6. Engagements → Add 'Contact Email' field (type: Lookup → Contact → Email)");
-  console.log("  7. Engagements → 'Sessions Remaining': convert to Formula → {Sessions Contracted} - {Sessions Completed}");
-  console.log("  8. Some views may require manual filter/sort configuration in Airtable UI.");
-  console.log("See README.md for view filter specifications.\n");
+  console.log("  Fields:");
+  console.log("    1. Contacts → Add 'Created' field (type: Created time)");
+  console.log("    2. Contacts → Add 'Modified' field (type: Last modified time)");
+  console.log("    3. Contacts → 'Sessions Remaining': convert to Formula → {Sessions} - {Sessions Completed}");
+  console.log("    4. Engagements → Add 'Created' field (type: Created time)");
+  console.log("    5. Engagements → Add 'Contact Name' field (type: Lookup → Contact → Name)");
+  console.log("    6. Engagements → Add 'Contact Email' field (type: Lookup → Contact → Email)");
+  console.log("    7. Engagements → 'Sessions Remaining': convert to Formula → {Sessions Contracted} - {Sessions Completed}");
+  console.log("  Views (Contacts):");
+  console.log("    8.  Funnel (Kanban, grouped by Stage)");
+  console.log("    9.  All Contacts (Grid)");
+  console.log("    10. Active Pipeline (Grid, filter: Stage not SERVE/NURTURE/BACK BURNER/ARCHIVE)");
+  console.log("    11. Clients — SERVE (Grid, filter: Stage = SERVE)");
+  console.log("    12. Nurture List (Grid, filter: Stage = NURTURE)");
+  console.log("    13. Partners (Grid, filter: Stage = PARTNER)");
+  console.log("    14. SVI / SVN (Grid, filter: Source contains SVI)");
+  console.log("    15. New This Week (Grid, filter: Created is within past week)");
+  console.log("  Views (Engagements):");
+  console.log("    16. Active Engagements (Grid, filter: Status = Active)");
+  console.log("    17. All Engagements (Grid)");
+  console.log("    18. Expiring Soon (Grid, filter: Expiration Date is within next 30 days)");
+  console.log("See README.md for full view filter specifications.\n");
 }
 
 main().catch((err) => {
