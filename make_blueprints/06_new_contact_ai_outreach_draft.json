@@ -1,0 +1,92 @@
+{
+  "name": "New Contact → AI Outreach Draft",
+  "version": 2,
+  "flow": [
+    {
+      "id": 1,
+      "module": "airtable:TriggerWatchRecords",
+      "version": 3,
+      "parameters": {
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "triggerField": "Created",
+        "formula": "AND({Stage} = 'NEW', {Draft Outreach Email} = '')"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "note": "Watch for new contacts at NEW stage without a draft email"
+      }
+    },
+    {
+      "id": 2,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "method": "POST",
+        "headers": [
+          { "name": "x-api-key", "value": "{{env.ANTHROPIC_API_KEY}}" },
+          { "name": "anthropic-version", "value": "2023-06-01" },
+          { "name": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "model": "claude-sonnet-4-20250514",
+          "max_tokens": 500,
+          "messages": [
+            {
+              "role": "user",
+              "content": "You are writing a warm, personalized outreach email on behalf of an executive ethics coach.\nContact name: {{1.Name}}\nCompany: {{1.Company}}\nRole: {{1.Role}}\nSource (where we met): {{1.Source}}\n\nWrite a short, genuine outreach email (3-4 sentences max).\n\n- Warm but not sycophantic\n- Reference the source/context naturally\n- No hard sell — just open a conversation\n- Sign off as \"Dror\"\n\nReturn ONLY the email body text, no subject line, no explanation."
+            }
+          ]
+        }
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 300, "y": 0 },
+        "note": "Call Anthropic Claude API to generate outreach draft"
+      }
+    },
+    {
+      "id": 3,
+      "module": "json:ParseJSON",
+      "version": 1,
+      "parameters": {
+        "data": "{{2.data}}"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 600, "y": 0 },
+        "note": "Parse the Claude API response"
+      }
+    },
+    {
+      "id": 4,
+      "module": "airtable:ActionUpdateRecord",
+      "version": 3,
+      "parameters": {
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "id": "{{1.id}}"
+      },
+      "mapper": {
+        "Draft Outreach Email": "{{3.content[0].text}}"
+      },
+      "metadata": {
+        "designer": { "x": 900, "y": 0 },
+        "note": "Save AI draft to the contact record"
+      }
+    }
+  ],
+  "metadata": {
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true
+    },
+    "designer": { "orphans": [] }
+  }
+}

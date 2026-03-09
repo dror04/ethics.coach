@@ -1,0 +1,94 @@
+{
+  "name": "Post-Breakthrough → Propose Reminder",
+  "version": 2,
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-calendar:TriggerWatchEvents",
+      "version": 4,
+      "parameters": {
+        "calendarId": "primary",
+        "pollInterval": 900
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 }
+      },
+      "filter": {
+        "name": "Breakthrough event that ended recently",
+        "conditions": [
+          [
+            {
+              "a": "{{lower(1.summary)}}",
+              "b": "breakthrough",
+              "o": "text:contain"
+            },
+            {
+              "a": "{{1.end.dateTime}}",
+              "b": "{{addMinutes(now; -120)}}",
+              "o": "date:after"
+            },
+            {
+              "a": "{{1.end.dateTime}}",
+              "b": "{{now}}",
+              "o": "date:before"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "attendeeEmail": "{{1.attendees[0].email}}"
+      },
+      "metadata": {
+        "designer": { "x": 300, "y": 0 },
+        "note": "Extract attendee email"
+      }
+    },
+    {
+      "id": 3,
+      "module": "airtable:SearchRecords",
+      "version": 3,
+      "parameters": {
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "formula": "({Email} = '{{2.attendeeEmail}}')"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 600, "y": 0 }
+      }
+    },
+    {
+      "id": 4,
+      "module": "google-email:ActionSendEmail",
+      "version": 2,
+      "parameters": {
+        "to": "{{env.MY_EMAIL}}",
+        "subject": "💬 Log proposal for {{3.Name}}",
+        "htmlBody": "<p>Your breakthrough session with <strong>{{3.Name}}</strong> just ended.</p><p>Don't forget to log:</p><ul><li>Propose Amount</li><li>Yes/No response</li></ul><p>Direct link: <a href=\"https://airtable.com/{{env.AIRTABLE_BASE_ID}}/{{env.CONTACTS_TABLE_ID}}/{{3.id}}\">Open in Airtable</a></p>"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 900, "y": 0 },
+        "note": "Email self a proposal reminder with direct Airtable link"
+      }
+    }
+  ],
+  "metadata": {
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true
+    },
+    "designer": { "orphans": [] }
+  }
+}

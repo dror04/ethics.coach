@@ -1,0 +1,133 @@
+{
+  "name": "PandaDoc Signed → SERVE Stage + Engagement",
+  "version": 2,
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": "pandadoc_webhook",
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "note": "Receives PandaDoc document_state_changed webhook"
+      },
+      "filter": {
+        "name": "Document Completed",
+        "conditions": [
+          [
+            {
+              "a": "{{1.status}}",
+              "b": "document.completed",
+              "o": "text:equal"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "recipientEmail": "{{1.data.recipients[0].email}}",
+        "documentName": "{{1.data.name}}",
+        "completionDate": "{{formatDate(now; \"YYYY-MM-DD\")}}"
+      },
+      "metadata": {
+        "designer": { "x": 300, "y": 0 },
+        "note": "Parse PandaDoc payload"
+      }
+    },
+    {
+      "id": 3,
+      "module": "airtable:SearchRecords",
+      "version": 3,
+      "parameters": {
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "formula": "({Email} = '{{2.recipientEmail}}')"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 600, "y": 0 }
+      }
+    },
+    {
+      "id": 4,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 900, "y": 0 }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 5,
+              "module": "airtable:ActionUpdateRecord",
+              "version": 3,
+              "parameters": {
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "id": "{{3.id}}"
+              },
+              "mapper": {
+                "Stage": "SERVE",
+                "Contract Date": "{{2.completionDate}}",
+                "Last Interaction": "{{2.completionDate}}"
+              },
+              "metadata": {
+                "designer": { "x": 1200, "y": -150 },
+                "note": "Update contact to SERVE with contract date"
+              }
+            },
+            {
+              "id": 6,
+              "module": "airtable:ActionCreateRecord",
+              "version": 3,
+              "parameters": {
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Engagements"
+              },
+              "mapper": {
+                "Contact": ["{{3.id}}"],
+                "Status": "Active",
+                "Start Date": "{{2.completionDate}}",
+                "Contract Date": "{{2.completionDate}}",
+                "Notes": "Contract signed via PandaDoc: {{2.documentName}}"
+              },
+              "metadata": {
+                "designer": { "x": 1500, "y": -150 },
+                "note": "Create new Engagement linked to Contact"
+              }
+            }
+          ],
+          "filter": {
+            "name": "Contact Found",
+            "conditions": [
+              [{ "a": "{{3.id}}", "o": "exist" }]
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true
+    },
+    "designer": { "orphans": [] }
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "name": "Daily Expiration Alert",
+  "version": 2,
+  "flow": [
+    {
+      "id": 1,
+      "module": "builtin:BasicScheduler",
+      "version": 1,
+      "parameters": {
+        "time": "09:00",
+        "timezone": "America/New_York"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "note": "Runs every day at 9:00 AM"
+      }
+    },
+    {
+      "id": 2,
+      "module": "airtable:SearchRecords",
+      "version": 3,
+      "parameters": {
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Engagements",
+        "formula": "AND({Status} = 'Active', IS_BEFORE({Expiration Date}, DATEADD(TODAY(), 14, 'days')), IS_AFTER({Expiration Date}, TODAY()))"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 300, "y": 0 },
+        "note": "Find active engagements expiring within 14 days"
+      }
+    },
+    {
+      "id": 3,
+      "module": "builtin:BasicIterator",
+      "version": 1,
+      "parameters": {
+        "array": "{{2}}"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 600, "y": 0 },
+        "note": "Iterate over each expiring engagement"
+      }
+    },
+    {
+      "id": 4,
+      "module": "google-email:ActionSendEmail",
+      "version": 2,
+      "parameters": {
+        "to": "{{env.MY_EMAIL}}",
+        "subject": "⚠️ Package expiring soon: {{3.Contact Name}}",
+        "htmlBody": "<p><strong>{{3.Contact Name}}</strong>'s package expires on <strong>{{3.Expiration Date}}</strong>.</p><p>Sessions remaining: <strong>{{3.Sessions Remaining}}</strong></p><p>Consider scheduling a renewal conversation.</p>"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 900, "y": 0 },
+        "note": "Send expiration alert email"
+      }
+    }
+  ],
+  "metadata": {
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true
+    },
+    "designer": { "orphans": [] }
+  }
+}

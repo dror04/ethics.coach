@@ -1,0 +1,166 @@
+{
+  "name": "Calendar Keywords → INVITE or CREATE Stage",
+  "version": 2,
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-calendar:TriggerWatchEvents",
+      "version": 4,
+      "parameters": {
+        "calendarId": "primary",
+        "pollInterval": 900
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 }
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 300, "y": 0 }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 3,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "attendeeEmail": "{{1.attendees[0].email}}",
+                "targetStage": "INVITE"
+              },
+              "metadata": {
+                "designer": { "x": 600, "y": -150 },
+                "note": "Two-hour-intensive → INVITE"
+              }
+            },
+            {
+              "id": 4,
+              "module": "airtable:SearchRecords",
+              "version": 3,
+              "parameters": {
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "formula": "({Email} = '{{3.attendeeEmail}}')"
+              },
+              "mapper": {},
+              "metadata": {
+                "designer": { "x": 900, "y": -150 }
+              }
+            },
+            {
+              "id": 5,
+              "module": "airtable:ActionUpdateRecord",
+              "version": 3,
+              "parameters": {
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "id": "{{4.id}}"
+              },
+              "mapper": {
+                "Stage": "INVITE",
+                "Last Interaction": "{{formatDate(now; \"YYYY-MM-DD\")}}"
+              },
+              "metadata": {
+                "designer": { "x": 1200, "y": -150 },
+                "note": "Update to INVITE"
+              }
+            }
+          ],
+          "filter": {
+            "name": "Title contains two-hour-intensive",
+            "conditions": [
+              [
+                {
+                  "a": "{{lower(1.summary)}}",
+                  "b": "two-hour-intensive",
+                  "o": "text:contain"
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "flow": [
+            {
+              "id": 6,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "attendeeEmail": "{{1.attendees[0].email}}",
+                "targetStage": "CREATE"
+              },
+              "metadata": {
+                "designer": { "x": 600, "y": 150 },
+                "note": "Breakthrough → CREATE"
+              }
+            },
+            {
+              "id": 7,
+              "module": "airtable:SearchRecords",
+              "version": 3,
+              "parameters": {
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "formula": "({Email} = '{{6.attendeeEmail}}')"
+              },
+              "mapper": {},
+              "metadata": {
+                "designer": { "x": 900, "y": 150 }
+              }
+            },
+            {
+              "id": 8,
+              "module": "airtable:ActionUpdateRecord",
+              "version": 3,
+              "parameters": {
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "id": "{{7.id}}"
+              },
+              "mapper": {
+                "Stage": "CREATE",
+                "Last Interaction": "{{formatDate(now; \"YYYY-MM-DD\")}}"
+              },
+              "metadata": {
+                "designer": { "x": 1200, "y": 150 },
+                "note": "Update to CREATE"
+              }
+            }
+          ],
+          "filter": {
+            "name": "Title contains breakthrough",
+            "conditions": [
+              [
+                {
+                  "a": "{{lower(1.summary)}}",
+                  "b": "breakthrough",
+                  "o": "text:contain"
+                }
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false
+    },
+    "designer": { "orphans": [] }
+  }
+}

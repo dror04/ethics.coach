@@ -1,0 +1,157 @@
+{
+  "name": "Zoom Meeting Summary → Contacts",
+  "version": 2,
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": "zoom_webhook",
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "note": "Receives Zoom meeting.ended webhook"
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "meetingUuid": "{{1.payload.object.uuid}}",
+        "hostEmail": "{{1.payload.object.host_email}}",
+        "participantEmails": "{{1.payload.object.participant_email}}"
+      },
+      "metadata": {
+        "designer": { "x": 300, "y": 0 },
+        "note": "Parse Zoom webhook payload"
+      }
+    },
+    {
+      "id": 3,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "url": "https://api.zoom.us/v2/meetings/{{2.meetingUuid}}/meeting_summary",
+        "method": "GET",
+        "headers": [
+          { "name": "Authorization", "value": "Bearer {{env.ZOOM_ACCESS_TOKEN}}" }
+        ]
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 600, "y": 0 },
+        "note": "Retrieve Zoom AI Companion meeting summary"
+      }
+    },
+    {
+      "id": 4,
+      "module": "builtin:BasicIterator",
+      "version": 1,
+      "parameters": {
+        "array": "{{1.payload.object.participants}}"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 900, "y": 0 },
+        "note": "Iterate over each participant"
+      },
+      "filter": {
+        "name": "Exclude Host",
+        "conditions": [
+          [
+            {
+              "a": "{{4.email}}",
+              "b": "{{2.hostEmail}}",
+              "o": "text:notequal"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "module": "airtable:SearchRecords",
+      "version": 3,
+      "parameters": {
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "formula": "({Email} = '{{4.email}}')"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 1200, "y": 0 }
+      }
+    },
+    {
+      "id": 6,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 1500, "y": 0 }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 7,
+              "module": "airtable:ActionUpdateRecord",
+              "version": 3,
+              "parameters": {
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "id": "{{5.id}}"
+              },
+              "mapper": {
+                "Comments": "{{5.Comments}}\n\n--- Zoom Meeting Summary ({{formatDate(now; \"YYYY-MM-DD\")}}) ---\n{{3.data.meeting_summary}}",
+                "Last Interaction": "{{formatDate(now; \"YYYY-MM-DD\")}}"
+              },
+              "metadata": {
+                "designer": { "x": 1800, "y": -100 },
+                "note": "Append meeting summary to Comments"
+              }
+            }
+          ],
+          "filter": {
+            "name": "Contact Found",
+            "conditions": [
+              [{ "a": "{{5.id}}", "o": "exist" }]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "module": "google-email:ActionSendEmail",
+      "version": 2,
+      "parameters": {
+        "to": "{{2.hostEmail}}",
+        "subject": "Zoom Meeting Summary Logged",
+        "htmlBody": "<p>Meeting summary for <strong>{{1.payload.object.topic}}</strong> has been logged to CRM contacts.</p><p>Summary: {{3.data.meeting_summary}}</p>"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 2100, "y": 0 },
+        "note": "Send yourself a summary notification"
+      }
+    }
+  ],
+  "metadata": {
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true
+    },
+    "designer": { "orphans": [] }
+  }
+}

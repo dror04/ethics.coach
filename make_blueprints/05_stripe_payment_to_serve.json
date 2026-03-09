@@ -1,0 +1,139 @@
+{
+  "name": "Stripe Payment → SERVE Stage + Engagement",
+  "version": 2,
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": "stripe_webhook",
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "note": "Receives Stripe payment_intent.succeeded or checkout.session.completed"
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "customerEmail": "{{ifempty(1.data.object.customer_details.email; 1.data.object.receipt_email)}}",
+        "amount": "{{1.data.object.amount_received / 100}}",
+        "paymentIntentId": "{{ifempty(1.data.object.payment_intent; 1.data.object.id)}}",
+        "paymentUrl": "{{ifempty(1.data.object.url; concat(\"https://dashboard.stripe.com/payments/\"; 1.data.object.id))}}"
+      },
+      "metadata": {
+        "designer": { "x": 300, "y": 0 },
+        "note": "Parse Stripe payload"
+      }
+    },
+    {
+      "id": 3,
+      "module": "airtable:SearchRecords",
+      "version": 3,
+      "parameters": {
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "formula": "({Email} = '{{2.customerEmail}}')"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 600, "y": 0 }
+      }
+    },
+    {
+      "id": 4,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 900, "y": 0 }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 5,
+              "module": "airtable:ActionUpdateRecord",
+              "version": 3,
+              "parameters": {
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "id": "{{3.id}}"
+              },
+              "mapper": {
+                "Stage": "SERVE",
+                "Fee": "{{2.amount}}",
+                "Stripe Link": "{{2.paymentUrl}}",
+                "Last Interaction": "{{formatDate(now; \"YYYY-MM-DD\")}}"
+              },
+              "metadata": {
+                "designer": { "x": 1200, "y": -150 },
+                "note": "Update contact to SERVE"
+              }
+            },
+            {
+              "id": 6,
+              "module": "airtable:ActionCreateRecord",
+              "version": 3,
+              "parameters": {
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Engagements"
+              },
+              "mapper": {
+                "Contact": ["{{3.id}}"],
+                "Fee": "{{2.amount}}",
+                "Start Date": "{{formatDate(now; \"YYYY-MM-DD\")}}",
+                "Status": "Active",
+                "Stripe Payment ID": "{{2.paymentIntentId}}",
+                "Stripe Link": "{{2.paymentUrl}}"
+              },
+              "metadata": {
+                "designer": { "x": 1500, "y": -150 },
+                "note": "Create new Engagement"
+              }
+            },
+            {
+              "id": 7,
+              "module": "quickbooks:ActionCreateInvoice",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "customerEmail": "{{2.customerEmail}}",
+                "amount": "{{2.amount}}",
+                "description": "Ethics.Coach Engagement"
+              },
+              "metadata": {
+                "designer": { "x": 1800, "y": -150 },
+                "note": "Create QuickBooks invoice"
+              }
+            }
+          ],
+          "filter": {
+            "name": "Contact Found",
+            "conditions": [
+              [{ "a": "{{3.id}}", "o": "exist" }]
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false
+    },
+    "designer": { "orphans": [] }
+  }
+}

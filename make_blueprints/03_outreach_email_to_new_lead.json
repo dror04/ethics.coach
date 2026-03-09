@@ -1,0 +1,118 @@
+{
+  "name": "Sent Outreach Email → NEW to OUTREACH",
+  "version": 2,
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-email:TriggerNewEmail",
+      "version": 2,
+      "parameters": {
+        "label": "Watch Sent Emails",
+        "folder": "SENT",
+        "maxResults": 10,
+        "pollInterval": 300
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 }
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "recipientEmail": "{{1.to}}",
+        "subject": "{{1.subject}}",
+        "sentDate": "{{formatDate(now; \"YYYY-MM-DD\")}}"
+      },
+      "metadata": {
+        "designer": { "x": 300, "y": 0 },
+        "note": "Extract recipient email from sent message"
+      }
+    },
+    {
+      "id": 3,
+      "module": "airtable:SearchRecords",
+      "version": 3,
+      "parameters": {
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "formula": "AND({Email} = '{{2.recipientEmail}}', {Stage} = 'NEW')"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 600, "y": 0 }
+      }
+    },
+    {
+      "id": 4,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 900, "y": 0 }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 5,
+              "module": "airtable:ActionUpdateRecord",
+              "version": 3,
+              "parameters": {
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "id": "{{3.id}}"
+              },
+              "mapper": {
+                "Stage": "OUTREACH",
+                "Last Interaction": "{{2.sentDate}}"
+              },
+              "metadata": {
+                "designer": { "x": 1200, "y": -100 },
+                "note": "Advance NEW → OUTREACH"
+              }
+            },
+            {
+              "id": 6,
+              "module": "airtable:ActionUpdateRecord",
+              "version": 3,
+              "parameters": {
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "id": "{{3.id}}"
+              },
+              "mapper": {
+                "Comments": "{{3.Comments}}\n\n--- Outreach: {{2.subject}} ({{2.sentDate}}) ---"
+              },
+              "metadata": {
+                "designer": { "x": 1500, "y": -100 },
+                "note": "Append email subject + date to Comments"
+              }
+            }
+          ],
+          "filter": {
+            "name": "NEW Contact Found",
+            "conditions": [
+              [{ "a": "{{3.id}}", "o": "exist" }]
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false
+    },
+    "designer": { "orphans": [] }
+  }
+}

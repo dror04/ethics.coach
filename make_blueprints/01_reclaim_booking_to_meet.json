@@ -1,0 +1,177 @@
+{
+  "name": "Reclaim Booking → MEET Stage",
+  "version": 2,
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-email:TriggerNewEmail",
+      "version": 2,
+      "parameters": {
+        "label": "Watch Emails",
+        "folder": "INBOX",
+        "maxResults": 10,
+        "pollInterval": 300
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 }
+      },
+      "filter": {
+        "name": "Reclaim Booking Filter",
+        "conditions": [
+          [
+            {
+              "a": "{{1.from}}",
+              "b": "reclaim.ai",
+              "o": "text:contain"
+            }
+          ],
+          [
+            {
+              "a": "{{1.subject}}",
+              "b": "confirmed",
+              "o": "text:contain"
+            },
+            {
+              "a": "{{1.subject}}",
+              "b": "booking",
+              "o": "text:contain"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "attendeeName": "{{replace(replace(1.subject; \"/.*with\\s+/\"; \"\"); \"/\\s+on.*/\"; \"\")}}",
+        "attendeeEmail": "{{1.replyTo}}",
+        "meetingDate": "{{formatDate(now; \"YYYY-MM-DD\")}}",
+        "meetingTitle": "{{1.subject}}"
+      },
+      "metadata": {
+        "designer": { "x": 300, "y": 0 },
+        "note": "Parse email body to extract attendee info"
+      }
+    },
+    {
+      "id": 3,
+      "module": "airtable:SearchRecords",
+      "version": 3,
+      "parameters": {
+        "base": "{{env.AIRTABLE_BASE_ID}}",
+        "table": "Contacts",
+        "formula": "({Email} = '{{2.attendeeEmail}}')"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 600, "y": 0 }
+      }
+    },
+    {
+      "id": 4,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 900, "y": 0 }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 5,
+              "module": "airtable:ActionUpdateRecord",
+              "version": 3,
+              "parameters": {
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts",
+                "id": "{{3.id}}"
+              },
+              "mapper": {
+                "Stage": "MEET",
+                "Meeting Date": "{{2.meetingDate}}",
+                "Last Interaction": "{{formatDate(now; \"YYYY-MM-DD\")}}",
+                "Meeting Type": "Reclaim"
+              },
+              "metadata": {
+                "designer": { "x": 1200, "y": -150 },
+                "note": "Update existing contact to MEET"
+              }
+            }
+          ],
+          "filter": {
+            "name": "Record Found",
+            "conditions": [
+              [{ "a": "{{3.id}}", "o": "exist" }]
+            ]
+          }
+        },
+        {
+          "flow": [
+            {
+              "id": 6,
+              "module": "airtable:ActionCreateRecord",
+              "version": 3,
+              "parameters": {
+                "base": "{{env.AIRTABLE_BASE_ID}}",
+                "table": "Contacts"
+              },
+              "mapper": {
+                "Name": "{{2.attendeeName}}",
+                "Email": "{{2.attendeeEmail}}",
+                "Stage": "MEET",
+                "Meeting Date": "{{2.meetingDate}}",
+                "Last Interaction": "{{formatDate(now; \"YYYY-MM-DD\")}}",
+                "Meeting Type": "Reclaim"
+              },
+              "metadata": {
+                "designer": { "x": 1200, "y": 150 },
+                "note": "Create new contact at MEET"
+              }
+            }
+          ],
+          "filter": {
+            "name": "Record Not Found",
+            "conditions": [
+              [{ "a": "{{3.id}}", "o": "not:exist" }]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "module": "google-email:ActionAddLabel",
+      "version": 2,
+      "parameters": {
+        "emailId": "{{1.id}}",
+        "label": "CRM: Processed"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 1500, "y": 0 }
+      }
+    }
+  ],
+  "metadata": {
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false
+    },
+    "designer": {
+      "orphans": []
+    }
+  }
+}
